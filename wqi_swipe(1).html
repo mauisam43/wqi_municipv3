@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WQI Szenarienvergleich – Kanton Zürich</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.29/"></script>
+
+<style>
+  :root {
+    --primaer:     #3A6B9E;
+    --sekundaer:   #4A8C5C;
+    --akzent:      #B85450;
+    --karte-tief:  #C3423F;
+    --karte-mitte: #EFE6C9;
+    --karte-hoch:  #418F58;
+    --grau:        #BEBEBE;
+    --hintergrund: #F7F7F7;
+    --text:        #2D2D2D;
+    --panel:       #FFFFFF;
+    --border:      #DEDEDE;
+    --serif: 'Noto Serif', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--serif);
+    background: var(--hintergrund);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .app-title {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primaer);
+    white-space: nowrap;
+  }
+
+  .divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  .selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .selector-label {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #aaa;
+  }
+
+  .scenario-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  select {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 11px;
+    padding: 5px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    background: var(--hintergrund);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  select:focus { border-color: var(--primaer); }
+
+  .swap-btn {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 13px;
+    padding: 4px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--primaer);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .swap-btn:hover { background: var(--primaer); color: #fff; border-color: var(--primaer); }
+
+  /* Search */
+  .search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    position: relative;
+  }
+  .search-wrap input {
+    font-family: var(--serif);
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    background: var(--hintergrund);
+    color: var(--text);
+    width: 180px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--primaer); }
+  .search-wrap input::placeholder { color: var(--grau); font-style: italic; }
+
+  .search-btn {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 14px;
+    background: var(--primaer);
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .search-btn:hover { opacity: 0.85; }
+
+  .suggestions-box {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 280px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 200;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .suggestion-item {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--serif);
+    transition: background 0.1s;
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover { background: var(--hintergrund); }
+  .suggestion-item strong { display: block; font-weight: 600; color: var(--primaer); }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #viewDiv { flex: 1; height: 100%; }
+
+  /* Swipe handle styling override */
+  .esri-swipe__container { z-index: 5 !important; }
+  .esri-swipe__handle { background: var(--panel) !important; border: 2px solid var(--primaer) !important; }
+  .esri-swipe__handle-title { display: none !important; }
+
+  /* Map labels */
+  .map-label {
+    position: absolute;
+    top: 12px;
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 0.3px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  #labelLeft  { left: 55px;  background: var(--akzent);  color: #fff; }
+  #labelRight { right: 12px; background: var(--primaer); color: #fff; }
+
+  /* Legend */
+  .legend-panel {
+    position: absolute;
+    bottom: 28px;
+    left: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 14px;
+    z-index: 10;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .legend-title {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+  .legend-bar {
+    width: 150px;
+    height: 9px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #C3423F, #EFE6C9, #418F58);
+    margin-bottom: 4px;
+  }
+  .legend-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #888;
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    width: 150px;
+  }
+
+  /* Basemap switcher */
+  .basemap-switcher {
+    position: absolute;
+    bottom: 28px;
+    right: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 12px;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .basemap-label {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 6px;
+  }
+  .basemap-options { display: flex; gap: 4px; }
+  .basemap-opt {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .basemap-opt:hover { border-color: var(--primaer); color: var(--primaer); }
+  .basemap-opt.active { background: var(--primaer); border-color: var(--primaer); color: #fff; }
+
+  /* Loading */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(247,247,247,0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    gap: 14px;
+  }
+  .loading-text {
+    font-family: var(--serif);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--primaer);
+  }
+  .spinner {
+    width: 26px; height: 26px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primaer);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Gemeinde Popup */
+  .gemeinde-popup {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    z-index: 30;
+    animation: slideUp 0.18s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+  }
+  .gemeinde-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--hintergrund);
+    border-radius: 3px 3px 0 0;
+  }
+  .gemeinde-popup-name {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primaer);
+  }
+  .gemeinde-popup-sub {
+    font-size: 10px;
+    color: #aaa;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .gemeinde-popup-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--grau);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .gemeinde-popup-close:hover { color: var(--text); }
+  .gemeinde-popup-body { padding: 12px 14px; }
+  .popup-section-label {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 8px;
+  }
+  .popup-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+  .popup-row-label {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 10px;
+    color: var(--text);
+    width: 100px;
+    flex-shrink: 0;
+  }
+  .popup-bar-track {
+    flex: 1;
+    height: 6px;
+    background: #EBEBEB;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .popup-bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.4s ease;
+  }
+  .popup-row-val {
+    font-family: 'Avenir Next World', 'Avenir Next', 'Avenir', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    width: 30px;
+    text-align: right;
+    color: var(--text);
+  }
+
+  /* Toast */
+  .toast {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: #fff;
+    font-family: var(--serif);
+    font-size: 11px;
+    font-style: italic;
+    padding: 7px 16px;
+    border-radius: 2px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ============================================================
+     MOBILE / TABLET RESPONSIVE
+     Greift nur auf schmalen Bildschirmen – Desktop bleibt unberührt.
+     ============================================================ */
+  @media (max-width: 768px) {
+
+    /* dvh statt vh: vermeidet Sprünge durch die Browser-Adressleiste */
+    body { height: 100dvh; }
+
+    /* ── Kopfzeile: kompakt, sauber umbrechend ── */
+    header {
+      padding: 7px 10px;
+      gap: 6px 8px;
+      row-gap: 7px;
+    }
+    .app-title {
+      flex-basis: 100%;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .divider { display: none; }
+
+    /* Beide Szenario-Wähler teilen sich eine Zeile gleichmässig */
+    .selector-wrap {
+      flex: 1 1 0;
+      min-width: 0;
+      gap: 5px;
+    }
+    .selector-wrap select {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      font-size: 16px;          /* >=16px verhindert Auto-Zoom auf iOS */
+      padding: 7px 8px;
+    }
+    .swap-btn {
+      flex-shrink: 0;
+      font-size: 15px;
+      padding: 6px 9px;
+      align-self: center;
+    }
+
+    /* Suche in eigene volle Zeile, Vorschläge passend breit */
+    .search-wrap {
+      flex-basis: 100%;
+      margin-left: 0;
+      gap: 6px;
+    }
+    .search-wrap input {
+      flex: 1;
+      width: auto;
+      font-size: 16px;          /* kein Auto-Zoom */
+      padding: 7px 10px;
+    }
+    .search-btn {
+      flex-shrink: 0;
+      font-size: 12px;
+      padding: 7px 14px;
+    }
+    .suggestions-box {
+      width: 100%;
+      left: 0;
+      right: 0;
+      max-height: 45vh;
+    }
+
+    /* ── Karten-Labels etwas kleiner ── */
+    .map-label { font-size: 10px; padding: 4px 9px; top: 10px; }
+    #labelLeft  { left: 50px; }
+    #labelRight { right: 10px; }
+
+    /* ── Legende: kompakter, links unten ── */
+    .legend-panel {
+      bottom: 14px;
+      left: 8px;
+      padding: 8px 10px;
+      max-width: 44vw;
+    }
+    .legend-bar,
+    .legend-labels { width: 100%; min-width: 90px; }
+    .legend-title { font-size: 9px; margin-bottom: 5px; }
+
+    /* ── Darstellungs-Umschalter: rechts unten, Buttons dürfen umbrechen ── */
+    .basemap-switcher {
+      bottom: 14px;
+      right: 8px;
+      padding: 6px 7px;
+      max-width: 42vw;
+    }
+    .basemap-label { font-size: 8px; margin-bottom: 4px; letter-spacing: 0.4px; }
+    .basemap-options { flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+    .basemap-opt { font-size: 10px; padding: 4px 8px; }
+
+    /* ── Gemeinde-Popup: responsive Breite, scrollbar bei Bedarf ──
+       Kein Eingriff in display (JS schaltet block/none); nur Breite begrenzen
+       und den Body bei wenig Platz scrollbar machen. */
+    .gemeinde-popup {
+      width: min(340px, calc(100vw - 16px));
+      bottom: 14px;
+      overflow: hidden;
+    }
+    .gemeinde-popup-body {
+      max-height: 52dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .popup-row-label { width: 84px; }
+
+    .toast { bottom: 80px; max-width: 90vw; white-space: normal; text-align: center; }
+  }
+
+  /* Sehr schmale Geräte: Wähler-Beschriftung weglassen, farbiger Punkt genügt */
+  @media (max-width: 400px) {
+    .selector-label { display: none; }
+    .app-title { font-size: 11px; }
+    .basemap-switcher { padding: 5px 6px; max-width: 40vw; }
+    .basemap-opt { font-size: 9px; padding: 3px 6px; }
+  }
+
+  /* Bewegungsreduktion respektieren */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="app-title">WQI Szenarienvergleich · Gemeindeebene</span>
+  <div class="divider"></div>
+
+  <div class="selector-wrap">
+    <span class="scenario-dot" style="background:#B85450;"></span>
+    <span class="selector-label">Links</span>
+    <select id="selectLeft">
+      <option value="status_quo" selected>Status Quo (0/70/30%)</option>
+      <option value="basis">Basis (33/33/33%)</option>
+      <option value="urban">Urban (20/50/30%)</option>
+      <option value="umwelt">Umwelt (50/30/20%)</option>
+    </select>
+  </div>
+
+  <button class="swap-btn" id="swapBtn" title="Szenarien tauschen">⇄</button>
+
+  <div class="selector-wrap">
+    <span class="scenario-dot" style="background:#3A6B9E;"></span>
+    <span class="selector-label">Rechts</span>
+    <select id="selectRight">
+      <option value="status_quo">Status Quo (0/70/30%)</option>
+      <option value="basis" selected>Basis (33/33/33%)</option>
+      <option value="urban">Urban (20/50/30%)</option>
+      <option value="umwelt">Umwelt (50/30/20%)</option>
+    </select>
+  </div>
+
+  <div class="search-wrap">
+    <input type="text" id="gemeindeInput" placeholder="Gemeinde suchen…" autocomplete="off" />
+    <button class="search-btn" id="searchBtn">Suchen</button>
+    <div id="gemeindeSuggestions" class="suggestions-box"></div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="viewDiv"></div>
+
+  <div class="map-label" id="labelLeft">Status Quo</div>
+  <div class="map-label" id="labelRight">Basis</div>
+
+  <div class="legend-panel">
+    <div class="legend-title">WQI-Score</div>
+    <div class="legend-bar"></div>
+    <div class="legend-labels">
+      <span>tief</span>
+      <span>mittel</span>
+      <span>hoch</span>
+    </div>
+  </div>
+
+  <div class="basemap-switcher">
+    <div class="basemap-label">Darstellung</div>
+    <div class="basemap-options">
+      <button class="basemap-opt active" data-basemap="color">Farbig</button>
+      <button class="basemap-opt" data-basemap="gray">Grau</button>
+      <button class="basemap-opt" data-basemap="colorblind">Farbsehschwäche</button>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Karte wird geladen…</div>
+  </div>
+
+  <!-- Gemeinde Popup -->
+  <div class="gemeinde-popup" id="gemeindePopup" style="display:none;">
+    <div class="gemeinde-popup-header">
+      <div>
+        <div class="gemeinde-popup-name" id="popupName">–</div>
+        <div class="gemeinde-popup-sub" id="popupSub">–</div>
+      </div>
+      <button class="gemeinde-popup-close" id="popupClose">×</button>
+    </div>
+    <div class="gemeinde-popup-body">
+      <div class="popup-section-label">WQI-Szenarien</div>
+      <div id="popupScenarios"></div>
+      <div class="popup-section-label" style="margin-top:12px;">Dimensionen</div>
+      <div id="popupDimensions"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+require([
+  "esri/Map",
+  "esri/Basemap",
+  "esri/WebMap",
+  "esri/views/MapView",
+  "esri/widgets/Swipe",
+  "esri/layers/FeatureLayer"
+], function(Map, Basemap, WebMap, MapView, Swipe, FeatureLayer) {
+
+  const GEMEINDE_URL = "https://services2.arcgis.com/9N9SahQkXAzBgwts/arcgis/rest/services/main_gemeinden/FeatureServer/0";
+
+  const WEBMAP_IDS = {
+    basis:      { color: "db42600d8c3d43d3a76c2aed758973a4", colorblind: "0668768f7e224679b79fa4dc57e8909d" },
+    urban:      { color: "b77270c13e5c42918141935beb048310", colorblind: "0604178af7244629b9a228e7b1e13252" },
+    umwelt:     { color: "0d987f4cde824489804d4cba5f57f2a3", colorblind: "d62cf49692f347fabd19fd75f711fe0c" },
+    status_quo: { color: "87828a051fbf4a49a686f69bc8b0c287", colorblind: "63ad54f0e3d84cbc894ef3663dade41e" }
+  };
+
+  const LABELS = {
+    basis:      "Basis",
+    urban:      "Urban",
+    umwelt:     "Umwelt",
+    status_quo: "Status Quo"
+  };
+
+  // Basemap portal item IDs
+  const BASEMAP_IDS = {
+    color: null, // use WebMap's own basemap
+    gray:  "8b3d38c0819547faa83f7b7aca80bd76"
+  };
+
+  let view = null;
+  let swipeWidget = null;
+  let activeBasemap = "color";
+  let leftLayers = [];
+  let rightLayers = [];
+
+  async function loadMaps(leftScenario, rightScenario, center, zoom) {
+    const loading = document.getElementById("loadingOverlay");
+    loading.style.display = "flex";
+    loading.querySelector(".loading-text").textContent = "Karte wird geladen…";
+
+    if (view) { view.destroy(); view = null; swipeWidget = null; }
+
+    const leftId  = WEBMAP_IDS[leftScenario][activeBasemap]  || WEBMAP_IDS[leftScenario].color;
+    const rightId = WEBMAP_IDS[rightScenario][activeBasemap] || WEBMAP_IDS[rightScenario].color;
+
+    const mapLeft  = new WebMap({ portalItem: { id: leftId } });
+    const mapRight = new WebMap({ portalItem: { id: rightId } });
+
+    await Promise.all([mapLeft.load(), mapRight.load()]);
+
+    leftLayers  = mapLeft.layers.toArray();
+    rightLayers = mapRight.layers.toArray();
+
+    // Basemap: gray for both "gray" and "colorblind" modes, color uses WebMap's own
+    let basemap = mapLeft.basemap;
+    if (activeBasemap === "gray" || activeBasemap === "colorblind") {
+      basemap = new Basemap({ portalItem: { id: BASEMAP_IDS.gray } });
+    }
+
+    const combinedMap = new Map({ basemap });
+    leftLayers.forEach(l  => combinedMap.layers.add(l));
+    rightLayers.forEach(l => combinedMap.layers.add(l));
+
+    view = new MapView({
+      container: "viewDiv",
+      map: combinedMap,
+      center: center || [8.65, 47.42],
+      zoom: zoom || 10,
+      ui: { components: ["zoom"] },
+      popup: { autoOpenEnabled: false }
+    });
+
+    await view.when();
+
+    view.goTo({ center: center || [8.65, 47.42], zoom: zoom || 10 }, { animate: false });
+
+    // Click handler for custom popup
+    view.on("click", async (evt) => {
+      try {
+        const detailLayer = new FeatureLayer({ url: GEMEINDE_URL });
+        const query = detailLayer.createQuery();
+        query.geometry = evt.mapPoint;
+        query.spatialRelationship = "intersects";
+        query.outFields = ["NAME","n_gebaeude","wqi_basis","wqi_urban","wqi_umwelt","wqi_status_quo","dim_umwelt","dim_standort","dim_gebaeude"];
+        query.returnGeometry = false;
+        const result = await detailLayer.queryFeatures(query);
+        if (result.features && result.features.length > 0) {
+          openGemeindePopup(result.features[0].attributes, evt.screenPoint);
+        } else {
+          closeGemeindePopup();
+        }
+      } catch(e) { console.error(e); }
+    });
+
+    swipeWidget = new Swipe({
+      view,
+      leadingLayers:  leftLayers,
+      trailingLayers: rightLayers,
+      position: 50,
+      direction: "horizontal"
+    });
+    view.ui.add(swipeWidget);
+
+    // Hide default swipe titles
+    const titles = document.querySelectorAll(".esri-swipe__handle-title");
+    titles.forEach(t => t.style.display = "none");
+
+    document.getElementById("labelLeft").textContent  = LABELS[leftScenario];
+    document.getElementById("labelRight").textContent = LABELS[rightScenario];
+
+    loading.style.display = "none";
+  }
+
+  // Initial load
+  loadMaps("status_quo", "basis");
+
+  function getCurrentCenterZoom() {
+    return {
+      center: view ? [view.center.longitude, view.center.latitude] : null,
+      zoom:   view ? view.zoom : 10
+    };
+  }
+
+  // Selectors
+  document.getElementById("selectLeft").addEventListener("change", () => {
+    const { center, zoom } = getCurrentCenterZoom();
+    loadMaps(document.getElementById("selectLeft").value, document.getElementById("selectRight").value, center, zoom);
+  });
+  document.getElementById("selectRight").addEventListener("change", () => {
+    const { center, zoom } = getCurrentCenterZoom();
+    loadMaps(document.getElementById("selectLeft").value, document.getElementById("selectRight").value, center, zoom);
+  });
+
+  // Swap
+  document.getElementById("swapBtn").addEventListener("click", () => {
+    const l = document.getElementById("selectLeft");
+    const r = document.getElementById("selectRight");
+    const { center, zoom } = getCurrentCenterZoom();
+    const tmp = l.value; l.value = r.value; r.value = tmp;
+    loadMaps(l.value, r.value, center, zoom);
+  });
+
+  // Basemap toggle
+  // ── BASEMAP TOGGLE ──
+  function updateLegendColors() {
+    const hoch = activeBasemap === "colorblind" ? "#3A6B9E" : "#418F58";
+    document.querySelectorAll(".legend-bar").forEach(el => {
+      el.style.background = `linear-gradient(to right, #C3423F, #EFE6C9, ${hoch})`;
+    });
+  }
+
+  document.querySelectorAll(".basemap-opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.basemap === activeBasemap) return;
+      document.querySelectorAll(".basemap-opt").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeBasemap = btn.dataset.basemap;
+      updateLegendColors();
+      const { center, zoom } = getCurrentCenterZoom();
+      loadMaps(document.getElementById("selectLeft").value, document.getElementById("selectRight").value, center, zoom);
+    });
+  });
+
+  // ── GEMEINDE POPUP ──
+  function scoreToColor(v) {
+    if (v == null) return "#BEBEBE";
+    const t = Math.max(0, Math.min(1, v / 10));
+    const hoch = activeBasemap === "colorblind" ? "#3A6B9E" : "#418F58";
+    if (t < 0.5) return lerpColor("#C3423F", "#EFE6C9", t / 0.5);
+    return lerpColor("#EFE6C9", hoch, (t - 0.5) / 0.5);
+  }
+  function lerpColor(a, b, t) {
+    const ah = a.replace('#',''), bh = b.replace('#','');
+    const ar = parseInt(ah.slice(0,2),16), ag = parseInt(ah.slice(2,4),16), ab = parseInt(ah.slice(4,6),16);
+    const br = parseInt(bh.slice(0,2),16), bg = parseInt(bh.slice(2,4),16), bb = parseInt(bh.slice(4,6),16);
+    return `rgb(${Math.round(ar+(br-ar)*t)},${Math.round(ag+(bg-ag)*t)},${Math.round(ab+(bb-ab)*t)})`;
+  }
+
+  function renderRows(containerId, rows, attrs) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = rows.map(({key, label}) => {
+      const v = attrs[key];
+      const pct = v != null ? (v / 10 * 100).toFixed(1) : 0;
+      return `<div class="popup-row">
+        <span class="popup-row-label">${label}</span>
+        <div class="popup-bar-track"><div class="popup-bar-fill" style="width:${pct}%;background:${scoreToColor(v)};"></div></div>
+        <span class="popup-row-val">${v != null ? v.toFixed(2) : "–"}</span>
+      </div>`;
+    }).join("");
+  }
+
+  function openGemeindePopup(attrs) {
+    document.getElementById("popupName").textContent = attrs.NAME || "–";
+    document.getElementById("popupSub").textContent = `${attrs.n_gebaeude || "–"} Wohngebäude`;
+
+    renderRows("popupScenarios", [
+      { key: "wqi_basis",      label: "Basis" },
+      { key: "wqi_urban",      label: "Urban" },
+      { key: "wqi_umwelt",     label: "Umwelt" },
+      { key: "wqi_status_quo", label: "Status Quo" }
+    ], attrs);
+
+    renderRows("popupDimensions", [
+      { key: "dim_umwelt",   label: "Umwelt" },
+      { key: "dim_standort", label: "Standort" },
+      { key: "dim_gebaeude", label: "Gebäude" }
+    ], attrs);
+
+    document.getElementById("gemeindePopup").style.display = "block";
+  }
+
+  function closeGemeindePopup() {
+    document.getElementById("gemeindePopup").style.display = "none";
+  }
+
+  document.getElementById("popupClose").addEventListener("click", closeGemeindePopup);
+
+  // ── GEMEINDE SEARCH ──
+  let geocodeTimer = null;
+
+  document.getElementById("gemeindeInput").addEventListener("input", function() {
+    const q = this.value.trim();
+    clearTimeout(geocodeTimer);
+    const box = document.getElementById("gemeindeSuggestions");
+    if (q.length < 2) { box.style.display = "none"; return; }
+    geocodeTimer = setTimeout(() => fetchGemeindeSuggestions(q), 300);
+  });
+
+  async function fetchGemeindeSuggestions(q) {
+    const box = document.getElementById("gemeindeSuggestions");
+    try {
+      const params = new URLSearchParams({
+        text: q + ", Kanton Zürich, Schweiz",
+        maxSuggestions: 6,
+        countryCode: "CHE",
+        category: "City,Populated Place",
+        f: "json"
+      });
+      const resp = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/suggest?${params}`);
+      const data = await resp.json();
+      const suggestions = (data.suggestions || []).filter(s =>
+        s.text.toLowerCase().includes("zürich") || s.text.toLowerCase().includes("zurich")
+      );
+
+      box.innerHTML = "";
+      if (!suggestions.length) { box.style.display = "none"; return; }
+
+      suggestions.forEach(s => {
+        const item = document.createElement("div");
+        item.className = "suggestion-item";
+        item.innerHTML = `<strong>${s.text.split(",")[0]}</strong>${s.text.split(",").slice(1).join(",")}`;
+        item.addEventListener("click", () => geocodeGemeinde(s.magicKey, s.text));
+        box.appendChild(item);
+      });
+      box.style.display = "block";
+    } catch(e) { box.style.display = "none"; }
+  }
+
+  async function geocodeGemeinde(magicKey, text) {
+    document.getElementById("gemeindeInput").value = text.split(",")[0];
+    document.getElementById("gemeindeSuggestions").style.display = "none";
+    showToast("Zoome zu " + text.split(",")[0] + "…");
+    try {
+      const params = new URLSearchParams({
+        SingleLine: text,
+        magicKey: magicKey,
+        outFields: "Match_addr",
+        outSR: 4326,
+        f: "json"
+      });
+      const resp = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`);
+      const data = await resp.json();
+      const candidates = data.candidates || [];
+      if (!candidates.length) { showToast("Gemeinde nicht gefunden."); return; }
+      const loc = candidates[0].location;
+      view.goTo({ center: [loc.x, loc.y], zoom: 13 }, { duration: 900 });
+      showToast(text.split(",")[0] + " ✓");
+    } catch(e) { showToast("Fehler bei der Suche."); }
+  }
+
+  document.getElementById("searchBtn").addEventListener("click", () => {
+    const q = document.getElementById("gemeindeInput").value.trim();
+    if (q) { document.getElementById("gemeindeSuggestions").style.display = "none"; geocodeGemeinde("", q); }
+  });
+
+  document.getElementById("gemeindeInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      const q = e.target.value.trim();
+      if (q) { document.getElementById("gemeindeSuggestions").style.display = "none"; geocodeGemeinde("", q); }
+    }
+  });
+
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".search-wrap")) {
+      document.getElementById("gemeindeSuggestions").style.display = "none";
+    }
+  });
+
+  // Toast
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+});
+</script>
+</body>
+</html>
